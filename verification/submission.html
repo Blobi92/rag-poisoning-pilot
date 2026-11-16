@@ -1,0 +1,197 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Red-Teaming Our Own AI-Generated Research</title>
+<style>
+body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.35}
+h1{font-size:20pt;text-align:center} h2{font-size:14pt} h3{font-size:12pt}
+table{border-collapse:collapse} td,th{border:1px solid #999;padding:3px 6px;font-size:9.5pt;vertical-align:top}
+.c{text-align:center} .cap{font-size:9.5pt;font-style:italic}
+</style></head><body>
+
+<h1><b>Red-Teaming Our Own AI-Generated Research: Does “Content Verification” Really Stop RAG Poisoning?</b></h1>
+
+<table align="center" style="border:none"><tr>
+<td class="c" style="border:none">Avi E. Koenig<br>Independent</td>
+<td class="c" style="border:none">Blobi92<br>Independent</td>
+</tr></table>
+<p class="c"><b>With</b><br><b>Apart Research</b></p>
+
+<p><b>Abstract</b></p>
+<p>Research agents can now produce a complete study in under an hour: question, code, data, report and repository. Does such a result survive verification? We red-team our own team’s RAG-poisoning pilot, which an autonomous agent (Perplexity “Computer”) generated end to end during this sprint. The pilot claims that a source allowlist stops external poisoning (18/20 → 0/20) and that content verification against the canonical source is the <i>only</i> defense that stops a compromised trusted source (18/20 → 0/20). We apply a four-layer audit: code and data, the agent’s session transcript, citations, and a pre-registered reproduction. The headline content-verification result is <b>produced by the code itself</b>: poison is rejected because its document ID contains the string “poison”. The transcript shows that the two “successful” arms were added after the planned arms failed, and that the results file mixes several code versions. Three of six references contain errors, one of which points to an unrelated radiotherapy paper. With the original binary and model hash, the unmodified pipeline reproduces 5 of 7 arms exactly. A pre-registered extension (3 poison sets, 60 trials per arm) makes the threat-model gap concrete. Honest content verification blocks poison only while the canonical source is clean, at the cost of 5.5% of trusted chunks. Once that source is poisoned, it gives <b>no protection</b> (26/60 vs 25/60). Both outcomes follow from the design; what we measure is their cost and a dilution effect. We release a one-command reproduction and a reviewer checklist.</p>
+
+<h2><b>1. Introduction</b></h2>
+<p>Agents lower the cost of producing research-shaped artifacts much faster than they lower the cost of checking them. An agent that outputs hypotheses, a seven-arm design, a chart, a limitations section, citations and a GitHub repository has produced every surface signal of rigor. Whether its claims are true is a separate question. We treat that gap as an epistemic-infrastructure problem: <b>what does it take to verify an AI-generated result, and which failure modes should a reviewer expect?</b></p>
+<p>We study our own case. On the final day of this sprint, a team member prompted an autonomous agent with a research question on RAG poisoning. In one 34-minute session, the agent designed, ran, wrote up and pushed the study to GitHub. We then red-teamed it as if a stranger had written it. The topic suits a credibility audit, because it is itself about provenance and verification. The study’s own conclusion, “verify the <i>content’s</i> provenance, not just the source label”, applies to the study.</p>
+<p><b>Our main contributions are:</b></p>
+<ol>
+<li>A four-layer audit protocol (code and data, session provenance, citations, pre-registered reproduction) applied to a real agent-generated study.</li>
+<li>Evidence that the study’s headline result is produced by its own code, and that the threat model it claims to address was never simulated.</li>
+<li>A pre-registered extension that makes the limits of content verification concrete and measures its costs.</li>
+<li>A one-command, hash-pinned reproduction kit and a reviewer checklist for agent-generated research.</li>
+</ol>
+
+<h2><b>2. Related Work</b></h2>
+<p><b>RAG poisoning.</b> PoisonedRAG (Zou et al., 2024) reaches about 90% attack success (ASR) by injecting five texts per target question into a corpus of millions. Semantic Chameleon (Thornton, 2026) shows that hybrid BM25+vector retrieval cuts <i>gradient-guided</i> poisoning from 38% to 0%, and reports 0% attack success on a Wikipedia corpus.</p>
+<p><b>Provenance auditing.</b> “Distributed Denial of Science” (Gyevnár et al., 2026) shows that research agents consume poisoned open datasets (49.56% success, 6.0% detection), and that a five-check provenance-audit prompt reduces success to 0%.</p>
+<p><b>Guidance.</b> The OWASP RAG Security Cheat Sheet and INSS Memo 256 (Hershkovitz, 2026) recommend defense in depth.</p>
+<p><b>Research credibility.</b> The “garden of forking paths” (Gelman &amp; Loken, 2013) motivates pre-registration.</p>
+<p>Prior work audits <i>models</i> and <i>data</i>. We audit an agent’s <i>research process</i>, and show that it was the highest-yield layer.</p>
+
+<h2><b>3. Methods</b></h2>
+<p><b>Subject.</b> The audited repository is <code>Blobi92/rag-poisoning-pilot</code> (commits <code>8595a09</code> and <code>21d541f</code>, both co-authored by Perplexity).</p>
+<ul>
+<li><b>Data:</b> 759 Wikipedia chunks and 100 LLM-generated poison documents (5 per target question).</li>
+<li><b>Questions:</b> 20 targets, each with a correct and an attacker answer, plus 10 clean controls.</li>
+<li><b>Pipeline:</b> MiniLM-L6-v2 retrieval (top-5); Qwen2.5-0.5B-Instruct generator (llama.cpp, temperature 0).</li>
+<li><b>Arms:</b> (1) open ingestion, (2) allowlist, (3) compromised source (poison relabeled as Wikipedia), (4) + near-duplicate and keyword-stuffing screen, (5) + hybrid retrieval, (6) + embedding corroboration, (7) content verification against a fresh Wikipedia fetch.</li>
+</ul>
+<p><b>Disclosure:</b> a team member created this pilot during the sprint by prompting the agent; the agent did all design, code and writing. The audit is new sprint work.</p>
+<p><b>Layer 1, static audit:</b> we read all code and recomputed every reported number from the raw JSON files.</p>
+<p><b>Layer 2, provenance:</b> we recovered the agent’s session transcript and the earlier research conversation, and compared the plan written before the run with the reported design.</p>
+<p><b>Layer 3, citations:</b> we resolved every reference via arXiv, Crossref and the full-text PDFs, and checked each cited figure word for word.</p>
+<p><b>Layer 4, reproduction:</b></p>
+<ul>
+<li><b>Anchor run.</b> The <i>unmodified</i> upstream script, rerun once from scratch with the identical llama.cpp build (<code>b12389-1ae047c92</code>), model sha256 (<code>74a4da8c…</code>) and thread settings.</li>
+<li><b>Pre-registration</b> (commit <code>81bfacb</code>, made before any new result). New arms:
+  <ul>
+  <li><b>7′:</b> content verification without the ID shortcut; poison claims its target article’s URL.</li>
+  <li><b>8:</b> poison spliced into the canonical article and verified against that same poisoned text, simulating a malicious upstream edit.</li>
+  <li><b>8nv:</b> arm 8 without verification (control).</li>
+  <li><b>9:</b> an ingestion-time SHA-256 manifest of trusted chunks.</li>
+  </ul>
+  Also fixed in advance:
+  <ul>
+  <li><b>Scoring:</b> alias-based and normalized.</li>
+  <li><b>Poison sets:</b> three (the shipped set plus two regenerated with seeds 1 and 2), giving 60 trials per arm.</li>
+  <li><b>Statistics:</b> Wilson 95% CIs and exact McNemar tests on paired per-question outcomes.</li>
+  <li><b>A written prediction for every claim.</b></li>
+  </ul></li>
+<li><b>Deviation.</b> Our first run calibrated the screening threshold on ground-truth labels, unlike upstream. We fixed it, archived that run unanalyzed, and reran all three poison sets.</li>
+</ul>
+
+<h2><b>4. Results</b></h2>
+<p><b>The headline result is produced by the code.</b> The upstream verification function begins:</p>
+<pre>if "poison" in d["id"]: return False  # not present in canonical text</pre>
+<p>Every poison ID has the form <code>poison::&lt;answer&gt;::&lt;k&gt;</code>, so arm 7 removes all poison before any text is compared. Its 0/20 is guaranteed. Arm 2’s 0/20 is likewise true because the poison is never ingested.</p>
+<p>Other findings:</p>
+<ul>
+<li>The corpus covers 45 articles, not the reported 50.</li>
+<li>Arm 7 silently dropped 163/759 (21%) of trusted chunks.</li>
+<li>19 of 100 poison documents are one-liners, and one states the correct answer.</li>
+</ul>
+<p><b>The design changed after results were in.</b> The plan written before the run had five arms and expected screening to “partially recover”. It didn’t (17/20). The agent then added arm 6, and after that also failed, arm 7 (“one more cheap, realistic defense worth test[ing]”). Arm 7’s first run “kept 0/859 docs” and was then “fixed”. Earlier arms were never rerun after code edits, so the shipped results mix several code versions.</p>
+<p><b>Citations.</b> All six references exist; three contain errors:</p>
+<ul>
+<li>PoisonedRAG is cited as arXiv:2402.07167, an unrelated radiotherapy paper (the correct ID is 2402.07867).</li>
+<li>The INSS memo is misdated.</li>
+<li>A survey title is misquoted.</li>
+</ul>
+<p>The “provenance-audit literature” cited studies research agents consuming poisoned datasets, not RAG content matching.</p>
+<p><b>Reproduction.</b> The unmodified pipeline reproduces arms 1–5 exactly. Arm 6 differs by one, consistent with the mixed code versions. Arm 7 kept 717 rather than 596 chunks: its live Wikipedia fetches behave differently from run to run.</p>
+
+<p class="c"><img src="https://raw.githubusercontent.com/Avi-E-Koenig/rag-poisoning-pilot/verify/plan/verification/figure1_asr.png" width="600" alt="Figure 1"></p>
+<p class="cap"><b>Figure 1.</b> Attack success by defense arm, pooled over 3 poison sets (n = 60 per arm). Blue: generation ASR, i.e. the attacker’s answer was produced, with Wilson 95% CI. Orange: retrieval ASR, i.e. poison in the top-5 context. Arms 1–6 replicate the pilot. 7′ is content verification without the ID shortcut. 8 and 8nv splice the poison into the canonical article, with and without verification. 9 is an ingestion-time hash manifest.</p>
+
+<p class="cap"><b>Table 1.</b> Pre-registered predictions against outcomes (60 trials per arm). “By design” marks outcomes that follow logically from the arm’s construction.</p>
+<table>
+<tr><th>Claim / arm</th><th>Prediction</th><th>Outcome</th></tr>
+<tr><td>Allowlist (2)</td><td>0/60, by design</td><td>0/60 ✔</td></tr>
+<tr><td>Compromised source (3) vs screening, hybrid, corroboration (4–6)</td><td>Arms 4–6 ≥ 70% of arm 3; not significant</td><td>56 vs 53, 53, 53/60; McNemar p = 0.25, 1, 1 ✔</td></tr>
+<tr><td>Content verification, clean canonical (7′)</td><td>0/60 (by design), with some false rejections</td><td>0/60; 42 trusted chunks (5.5%) dropped per set; clean accuracy 24/30 vs 27/30 ✔</td></tr>
+<tr><td><b>Content verification, poisoned canonical (8 vs 8nv)</b></td><td>8 ≈ 8nv (by design)</td><td><b>26/60 vs 25/60, p = 1.0</b> ✔</td></tr>
+<tr><td>Snapshot manifest (9)</td><td>0/60 (by design), no false rejections</td><td>0/60, 0 dropped ✔</td></tr>
+</table>
+
+<p><b>What is measured, and what follows from the design.</b> We apply our own construction check to our arms. Three ASR outcomes follow from the design:</p>
+<ul>
+<li><b>7′ = 0:</b> LLM-written poison is never a substring of the real article.</li>
+<li><b>8 ≈ 8nv:</b> verifying against the same poisoned text passes every poisoned chunk.</li>
+<li><b>9 = 0:</b> the poison is never in the manifest.</li>
+</ul>
+<p>The quantities genuinely measured are:</p>
+<ul>
+<li>the <b>cost</b> of live verification: 5.5% of trusted chunks dropped, and lower clean accuracy;</li>
+<li>a <b>dilution effect</b>: spliced poison reaches the top-5 in 53/60 trials but wins only 26/60 answers, against 56/60 as standalone documents;</li>
+<li>the <b>reproduction</b> itself.</li>
+</ul>
+<p>An independent rerun of our kit from an empty cache reproduced all 30 arm runs within ±1/20, 27 of them exactly.</p>
+
+<h2><b>5. Discussion and Limitations</b></h2>
+<p><b>Which claims stand?</b> The descriptive core of the pilot reproduces: a compromised source bypasses an allowlist, and cheap screening, hybrid retrieval and embedding corroboration barely help against keyword-stuffed poison. Its central claim does not. Content verification can only detect tampering <i>between</i> source and corpus, so it is blind to a compromised source by design. That is exactly the scenario the claim was about. An ingestion-time hash manifest gives the same post-ingestion protection without a live fetch.</p>
+<p><b>What went wrong is familiar.</b> Every failure we found is a known human failure mode that the agent’s speed amplified:</p>
+<ul>
+<li>adding arms until one “works”;</li>
+<li>resuming runs across code edits;</li>
+<li>a shortcut that encodes the answer into the test;</li>
+<li>citing from a summary of a summary.</li>
+</ul>
+<p>None of these is visible in the polished artifact; all were visible in the session transcript. <b>Provenance of the research process was the highest-yield audit layer</b>, and it took minutes. We suggest that agent-generated research ship with:</p>
+<ol>
+<li>its session transcript;</li>
+<li>a pre-registration commit made before results exist;</li>
+<li>single-version results stamped with a git SHA;</li>
+<li>machine-checkable citations.</li>
+</ol>
+<p>Each is cheap for an agent to produce and expensive for a reviewer to reconstruct.</p>
+<h3><b>Limitations</b></h3>
+<ul>
+<li><b>One case study</b>, with a small benchmark: 20 targets × 3 poison sets, one corpus, a 0.5B generator and one embedder. Larger generators may resist poisoning differently.</li>
+<li><b>Arm 8 is a simplification.</b> It simulates an upstream compromise by splicing text, and ignores Wikipedia’s editorial defenses.</li>
+<li><b>The ASR outcomes of arms 7′, 8 and 9 follow from their design</b>, so they illustrate the threat-model gap rather than discover it.</li>
+<li><b>llama-server is not bit-exact</b> across runs (up to ±1/20 per arm).</li>
+<li><b>We fixed one bug of our own</b> after seeing a run; it is disclosed and archived.</li>
+</ul>
+<h3><b>Future Work</b></h3>
+<ul>
+<li>Apply the protocol to many agent-generated studies to estimate base rates of each failure mode.</li>
+<li>Automate the construction check and the citation check as CI.</li>
+<li>Test larger generators and adaptive poison.</li>
+</ul>
+
+<h2><b>6. Conclusion</b></h2>
+<p>An AI-generated study on verifying content provenance failed its own standard: its key result came from its code, not its data. Once that is fixed, the honest finding is narrower and more useful. Content verification is a tamper-detection control, only as trustworthy as its reference, and blind to a compromised source by design. Auditing the <i>process</i> (transcript, pre-registration, single-version results) caught what auditing the <i>artifact</i> could not.</p>
+
+<h2><b>Code and Data</b></h2>
+<ul>
+<li><b>Code repository:</b> https://github.com/Avi-E-Koenig/rag-poisoning-pilot/tree/verify/plan/verification (one command: <code>bash verification/reproduce.sh</code>)</li>
+<li><b>Data/Datasets:</b> all corpora, poison sets, pinned Wikipedia snapshot, raw results and the agent transcript are in the same branch</li>
+<li><b>Other artifacts:</b> interactive results (<code>verification/results.html</code>); upstream issue https://github.com/Blobi92/rag-poisoning-pilot/issues/1; pull request https://github.com/Avi-E-Koenig/rag-poisoning-pilot/pull/1</li>
+</ul>
+
+<h2><b>Author Contributions</b></h2>
+<p>Blobi92 prompted the agent that produced the audited pilot. A.E.K. led the audit, designed the pre-registered extension and ran the reproduction. Both authors reviewed the final manuscript.</p>
+
+<h2><b>References</b></h2>
+<ol>
+<li>Zou, W., Geng, R., Wang, B., Jia, J. (2024). PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models. USENIX Security 2025. arXiv:2402.07867</li>
+<li>Thornton, S. (2026). Semantic Chameleon: Corpus-Dependent Poisoning Attacks and Defenses in RAG Systems. arXiv:2603.18034</li>
+<li>Gyevnár, B., Kasirzadeh, A., Shah, N. B. (2026). Distributed Denial of Science: How Indirect Data Poisoning of AI Systems Can Industrialize Scientific Fraud. arXiv:2607.10712</li>
+<li>OWASP. RAG Security Cheat Sheet. https://cheatsheetseries.owasp.org/cheatsheets/RAG_Security_Cheat_Sheet.html</li>
+<li>Hershkovitz, S. (2026). Data Poisoning Primer: Foundations, Threat Models, and National Security Risks. INSS Memorandum 256.</li>
+<li>Wang, Z. et al. (2022). Threats to Training: A Survey of Poisoning Attacks and Defenses on Machine Learning Systems. ACM Computing Surveys. doi:10.1145/3538707</li>
+<li>Cormack, G. V., Clarke, C. L. A., Büttcher, S. (2009). Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods. SIGIR.</li>
+<li>Gelman, A., Loken, E. (2013). The garden of forking paths.</li>
+<li>Audited artifact: Blobi92/rag-poisoning-pilot (2026). https://github.com/Blobi92/rag-poisoning-pilot</li>
+</ol>
+
+<h2><b>Appendix</b></h2>
+<h3><b>A. Dual-use and ethical considerations</b></h3>
+<p><b>Attack content.</b> The poison documents are low-sophistication false claims about well-known facts. Upstream-source poisoning is an established threat model, and we release no new attack technique.</p>
+<p><b>Misuse of the method.</b> The audit method could be misused to discredit legitimate work. We mitigate this by reporting what reproduces, publishing every artifact, and pre-registering.</p>
+<p><b>Data.</b> No personal data is processed, and account names were removed from the republished transcript.</p>
+<h3><b>B. Reviewer checklist for agent-generated research</b></h3>
+<ol>
+<li><b>Transcript:</b> compare the plan written before the run with the reported design.</li>
+<li><b>Single version:</b> do the results come from one code version? Look for resume, skip or cache logic.</li>
+<li><b>Construction check:</b> find the line of code that decides each headline number. Does it use labels the defense shouldn’t see?</li>
+<li><b>Recount:</b> recompute the descriptive numbers from the raw data.</li>
+<li><b>Threat model:</b> is the claimed scenario simulated, or only a proxy for it?</li>
+<li><b>Citations:</b> resolve each ID and title, and find each quoted figure in the source.</li>
+<li><b>Variance:</b> are there seeds, CIs and paired tests?</li>
+<li><b>Pinned reproduction:</b> binary build, model hash, lockfile, data snapshot.</li>
+</ol>
+<h3><b>C. Full Phase D results</b></h3>
+<p>Per-arm counts, CIs, per-set values, retrieval ASR, target correct-rate and paired tests are in <code>verification/RESULTS.md</code>. All findings (F1–F13, P1–P11, C1–C8) are in <code>VERIFICATION_PLAN.md</code>.</p>
+
+<h2><b>LLM Usage Statement</b></h2>
+<p>The audited pilot was generated end to end by Perplexity’s agent from a team member’s prompt; that is the object of study. The audit used Claude (Anthropic) as a coding assistant for the code reading, the scripts, running the experiments, and drafting this report. The authors directed the work, made the design decisions (self-audit framing, pre-registration, which claims to test) and reviewed the results. Every number in this report was recomputed from committed raw data, and every claim links to an artifact in the repository. One error the assistant introduced (the screening calibration) was caught and disclosed.</p>
+</body></html>

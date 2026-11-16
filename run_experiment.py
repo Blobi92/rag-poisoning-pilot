@@ -175,7 +175,7 @@ def main():
             t0 = time.time()
             canon = {}
             arts = sorted(set(d["url"].split("/wiki/")[-1].replace("_", " ")
-                           for d in docs if d.get("source") == "wikipedia" and "poison" not in d["id"]))
+                           for d in docs if d.get("source") == "wikipedia" and d.get("url")))
             for art in arts:
                 ok = False
                 for attempt in range(4):
@@ -198,10 +198,12 @@ def main():
                     print(f"  WARN: could not re-fetch {art}")
             canon_all = " ".join(canon.values())
             def verified(d):
-                if "poison" in d["id"]:
-                    return False  # not present in canonical text
-                return re.sub(r"\s+", " ", d["text"]) in canon.get(
-                    d["url"].split("/wiki/")[-1].replace("_", " "), canon_all)
+                # Content-only check: keep a doc iff its text appears in the canonical
+                # article it claims (or anywhere in the canonical set if it claims none).
+                # (An earlier version rejected poison by document ID, which made the
+                # arm's 0/20 a result of the code itself; see verification/REPORT.md.)
+                claimed = d.get("url", "").split("/wiki/")[-1].replace("_", " ")
+                return re.sub(r"\s+", " ", d["text"]) in canon.get(claimed, canon_all)
             n0 = len(docs)
             docs = [d for d in docs if verified(d)]
             screen_info = {"verified_corpus": n0, "kept": len(docs),

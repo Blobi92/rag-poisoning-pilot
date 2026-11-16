@@ -1,0 +1,5 @@
+live canon: 42 fetched, failed=['Human Genome Project', 'Penicillin', 'Vaccine']
+[S1] 1_baseline                           ret 20/20  gen(norm) 19/20  gen(raw) 19/20  correct  1/20  clean 9/10  trustedFR 0  (70.0s)
+[S1] 2_allowlist                          ret  0/20  gen(norm)  0/20  gen(raw)  0/20  correct 18/20  clean 9/10  trustedFR 0  (29.8s)
+[S1] 3_compromised                        ret 20/20  gen(norm) 20/20  gen(raw) 20/20  correct  0/20  clean 9/10  trustedFR 0  (33.3s)
+S1 EXIT=143

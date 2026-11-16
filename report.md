@@ -1,5 +1,7 @@
 # Can Validated Data Stop RAG Poisoning?
 
+> **⚠ Correction notice (2026-11-16).** An independent audit (see [`verification/`](https://github.com/Blobi92/rag-poisoning-pilot/blob/main/verification/README.md)) found that the original **arm 7 "content verification" rejected poison by document ID** (`"poison" in d["id"]`), so its 0/20 was produced by the code itself. The shortcut has been removed from `run_experiment.py`. Re-run without it, and with poison spliced into the canonical source itself, content verification gives **no protection against a compromised source** (26/60 vs 25/60 without verification, 3 poison sets). It only protects while the canonical source is clean. The headline conclusion below (§5 "The defense that worked", §7.3) is therefore **not supported as stated**. The numbers in `results.json` are kept unchanged for the record. Also corrected: the PoisonedRAG arXiv ID, the article count (45, not 50), the INSS memo date, and the survey title. Details: [`verification/REPORT.md`](https://github.com/Blobi92/rag-poisoning-pilot/blob/main/verification/REPORT.md).
+
 **A one-day controlled experiment on source validation vs. data poisoning in Retrieval-Augmented Generation**
 
 *Date: November 15, 2026 · All code, corpora, and raw results in `rag-poisoning/`*
@@ -22,7 +24,7 @@
 
 | Component | Detail |
 | :--- | :--- |
-| Trusted corpus | 759 text chunks from 50 Wikipedia articles (fetched live via the Wikipedia API), chunked at ~600 words with 100-word overlap |
+| Trusted corpus | 759 text chunks from 45 Wikipedia articles (fetched live via the Wikipedia API), chunked at ~600 words with 100-word overlap |
 | Attack | **PoisonedRAG-style**: 5 adversarial documents per target question (100 total), LLM-generated to assert the attacker's intended wrong answer while repeating the question's keywords so they rank highly in retrieval |
 | Target questions | 20 factual questions (who discovered penicillin, tallest mountain, year of the Moon landing, ...) each with a defined correct answer and attacker answer |
 | Clean controls | 10 untargeted factual questions answerable from the corpus |
@@ -58,7 +60,9 @@
 | 4. + Statistical screening | 817 | 20/20 | 17/20 | 9/10 |
 | 5. + Hybrid retrieval | 817 | 20/20 | 17/20 | 9/10 |
 | 6. + Embedding corroboration | 817 | 20/20 | 16/20 | 9/10 |
-| 7. **Content verification** | 596 | **0/20** | **0/20** | 8/10* |
+| 7. **Content verification** † | 596 | **0/20** | **0/20** | 8/10* |
+
+† Arm 7's 0/20 was produced by a document-ID shortcut in the original code (see the correction notice at the top).
 
 \* One "miss" in both arms is a scoring artifact: the model answered "β-lactam" and the checker expected the string "beta-lactam". Effective clean accuracy is 9/10. Arm 7 additionally lost one genuine question (Great Barrier Reef) because that article's verification re-fetch failed and its chunks were conservatively dropped.
 
@@ -93,7 +97,7 @@
 
 - Pilot scale: 20 target questions, 10 controls, 859 documents, one generator (Qwen2.5-0.5B) and one embedder (MiniLM). Proportions are large enough to be directionally clear but not for fine-grained statistics.
 - The attacker was keyword-based, not adaptive: a stronger adversary could try to evade duplicate/stuffing filters or mimic trusted phrasing.
-- Content verification depends on the upstream source being available and stable; in this run, 9 of 50 article re-fetches failed (API throttling) and those chunks were conservatively dropped — a reliability cost worth engineering around (caching, retries, signed snapshots).
+- Content verification depends on the upstream source being available and stable; in this run, re-fetches of several of the 45 articles failed, and 163 of 759 trusted chunks (21%) were dropped (API throttling) and those chunks were conservatively dropped — a reliability cost worth engineering around (caching, retries, signed snapshots).
 - "Compromised source" was simulated by relabeling poison documents, not by an actual edit to Wikipedia.
 
 ## 7. Conclusions
@@ -109,19 +113,19 @@
 
 ## 8. Sources
 
-- PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models — [github.com/ssg-research/cs858-wiki](https://github.com/ssg-research/cs858-wiki/blob/main/wiki-f26/papers/zou-2024-poisonedrag.md) and [arXiv:2402.07167](https://arxiv.org/abs/2402.07167)
+- PoisonedRAG: Knowledge Corruption Attacks to Retrieval-Augmented Generation of Large Language Models — [github.com/ssg-research/cs858-wiki](https://github.com/ssg-research/cs858-wiki/blob/main/wiki-f26/papers/zou-2024-poisonedrag.md) and [arXiv:2402.07867](https://arxiv.org/abs/2402.07867)
 - Corpus-Dependent Poisoning Attacks and Defenses in RAG Systems — [arxiv.org/html/2603.18034v1](https://arxiv.org/html/2603.18034v1)
 - OWASP RAG Security Cheat Sheet — [cheatsheetseries.owasp.org](https://cheatsheetseries.owasp.org/cheatsheets/RAG_Security_Cheat_Sheet.html)
-- INSS, Data Poisoning Primer (July 2026) — [inss.org.il](https://www.inss.org.il/wp-content/uploads/2026/07/Memo-256_digital.pdf)
+- INSS, Data Poisoning Primer (Memorandum 256, April 2026) — [inss.org.il](https://www.inss.org.il/wp-content/uploads/2026/07/Memo-256_digital.pdf)
 - "Distributed Denial of Science" provenance-audit study (2026) — [arxiv.org/html/2607.10712](https://arxiv.org/html/2607.10712)
-- Threats to Training: A Survey of Poisoning Attacks and Countermeasures — [dl.acm.org/doi/full/10.1145/3538707](https://dl.acm.org/doi/full/10.1145/3538707)
+- Threats to Training: A Survey of Poisoning Attacks and Defenses on Machine Learning Systems — [dl.acm.org/doi/full/10.1145/3538707](https://dl.acm.org/doi/full/10.1145/3538707)
 
 ## 9. Reproduction
 
 Everything runs locally with free components (no API keys):
 
 ```
-python3 build_corpus.py    # fetch 50 Wikipedia articles -> 759 chunks
+python3 build_corpus.py    # fetch 45 Wikipedia articles -> 759 chunks
 python3 gen_poison.py      # LLM-generated PoisonedRAG-style attack docs
 python3 run_experiment.py  # 7 arms, writes results.json + summary
 ```

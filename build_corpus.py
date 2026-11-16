@@ -1,4 +1,4 @@
-"""Fetch validated corpus: 50 Wikipedia articles, chunked for RAG."""
+"""Fetch validated corpus: 45 Wikipedia articles, chunked for RAG."""
 import json, re, time, requests
 
 ARTICLES = [
